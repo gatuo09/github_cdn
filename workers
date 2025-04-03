@@ -1,0 +1,80 @@
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url); // 解析请求的URL
+    
+    // 如果访问的不是根路径 '/'
+    if (url.pathname !== '/') {
+      // 基础GitHub Raw文件URL
+      let githubRawUrl = 'https://raw.githubusercontent.com';
+      
+      // 如果路径以GitHub URL开头，直接使用该路径
+      if (url.pathname.startsWith('/https://raw.githubusercontent.com')) {
+        // 去掉路径中的'/https://raw.githubusercontent.com'部分，保留剩余路径
+        githubRawUrl += url.pathname.slice('/https://raw.githubusercontent.com'.length);
+      } else {
+        // 否则使用环境变量配置的仓库信息构建路径
+        
+        // 如果配置了GitHub用户名
+        if (env.GH_NAME) {
+          githubRawUrl += '/' + env.GH_NAME; // 添加用户名到路径
+          
+          // 如果配置了仓库名
+          if (env.GH_REPO) {
+            githubRawUrl += '/' + env.GH_REPO; // 添加仓库名到路径
+            
+            // 如果配置了分支名
+            if (env.GH_BRANCH) {
+              githubRawUrl += '/' + env.GH_BRANCH; // 添加分支名到路径
+            }
+          }
+        }
+        // 添加请求的路径部分
+        githubRawUrl += url.pathname;
+      }
+
+      // 向GitHub发起请求（不包含认证信息，因为是公开库）
+      const response = await fetch(githubRawUrl);
+      
+      // 如果请求成功
+      if (response.ok) {
+        // 返回GitHub的响应内容和头信息
+        return new Response(response.body, {
+          status: response.status,
+          headers: response.headers
+        });
+      } else {
+        // 请求失败时返回错误信息
+        return new Response('无法获取文件，请检查路径是否正确。', { 
+          status: response.status 
+        });
+      }
+    } else {
+      // 当访问根路径 '/' 时，返回一个伪装成nginx的欢迎页面
+      return new Response(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Welcome to nginx!</title>
+          <style>
+            body {
+              width: 35em;
+              margin: 0 auto;
+              font-family: Tahoma, Verdana, Arial, sans-serif;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Welcome to nginx!</h1>
+          <p>If you see this page, the nginx web server is successfully installed and
+          working. Further configuration is required.</p>
+          <p><em>Thank you for using nginx.</em></p>
+        </body>
+        </html>
+      `, {
+        headers: {
+          'Content-Type': 'text/html; charset=UTF-8', // 设置HTML内容类型
+        },
+      });
+    }
+  }
+};
